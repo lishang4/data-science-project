@@ -1,28 +1,30 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
+# 成員：簡立軒, 黃禎智, 楊筱筠
 '''
 Created on 2022年1月2日
 
-@author: lishangchien
+@author: 簡立軒, 黃禎智, 楊筱筠
 '''
 
 from flask import (
-    Response, request
+    Response
 )
 from flask_restful_swagger_2 import (
     Resource
 )
-from . import stock
+from module.api.controller import stock
 
 def setup_route(app):
     '''
-    api routing
+    setup router
     '''
     
     app.add_resource(HealthyCheck, '/healthyCheck')
 
     app.add_resource(stock.GetStocks, '/api/v1/stocks')
     app.add_resource(stock.GetStock, '/api/v1/stock/<stockCode>')
+    app.add_resource(stock.PredictStockPrice, '/api/v1/stock/predict/price')
 
 class HealthyCheck(Resource):
     def get(self):

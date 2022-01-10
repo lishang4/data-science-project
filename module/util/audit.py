@@ -1,10 +1,12 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
+# 成員：簡立軒, 黃禎智, 楊筱筠
 '''
 Created on 2022年1月2日
 
-@author: lishangchien
+@author: 簡立軒, 黃禎智, 楊筱筠
 '''
+import sys, traceback
 
 # TODO: connect audit to logging
 
@@ -12,7 +14,7 @@ def input_error(parameter: str) -> str:
     return f'[InputError] missing "{parameter}" parameter.'
 
 def request_error(error: str) -> str:
-    return f'[RequestError] {except_raise(error)}'
+    return f'[RequestError] {error}'
 
 # exception handler
 def except_raise(e):

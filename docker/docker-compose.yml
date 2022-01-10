@@ -1,0 +1,19 @@
+networks:
+  emotibot:
+    external: true
+    name: emotibot
+services:
+  data-science-project:
+    container_name: data-science-project
+    image: harbor.lishang4.com/fju/data-science-project:5411a26-20220103-0405
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 5125M
+    ports:
+     - "9234:9234"
+    restart: always
+    volumes:
+    - /etc/localtime:/etc/localtime:rw
+version: '3.7'

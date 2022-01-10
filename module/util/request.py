@@ -1,9 +1,10 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
+# 成員：簡立軒, 黃禎智, 楊筱筠
 '''
 Created on 2022年1月2日
 
-@author: lishangchien
+@author: 簡立軒, 黃禎智, 楊筱筠
 '''
 from . import audit
 from . import constants as cts
@@ -59,3 +60,10 @@ def call(method: str = "POST", url: str="", header: dict={}, payload: dict={}, p
         return '', audit.request_error(e)
 
     return res, ''
+
+# read request as utf-8
+def read(request_stream: str) -> str:
+    try:
+        return request_stream.read().decode('utf-8')
+    except Exception as e:
+        return e

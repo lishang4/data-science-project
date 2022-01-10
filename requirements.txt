@@ -1,3 +1,4 @@
+matplotlib
 flask==1.1.2
 flask-restful-swagger-2==0.35
 flask-cors==3.0.9
@@ -7,5 +8,11 @@ gunicorn==20.0.4
 gevent==1.4.0
 requests==2.23.0
 greenlet==0.4.17
-Cython==0.29.13
-redis==3.5.3
+pytorch
+pandas==1.0.5
+mplfinance==0.12.8b6
+numpy==1.18.5
+lxml==4.7.1
+typing-extensions==4.0.1
+tqdm==4.62.3
+imgurpython==1.1.7

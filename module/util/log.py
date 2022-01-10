@@ -1,13 +1,16 @@
-# coding=UTF-8
+#/usr/bin/env python
+# -*- coding: utf-8 -*-
+# 成員：簡立軒, 黃禎智, 楊筱筠
 '''
 Created on 2022年1月2日
 
-@author: lishangchien
+@author: 簡立軒, 黃禎智, 楊筱筠
 '''
 import os
 import errno
 import logging.config
 
+# setop logging config by dictConfig
 def setup_logging(conf):
     log_dict = {
         'version': 1,
@@ -43,6 +46,7 @@ def setup_logging(conf):
             }
         }
     }
+    # mkdir if log path isn't exist.
     ''' python 2
     if not os.path.exists(conf['log_path']):
         os.makedirs(conf['log_path'])
@@ -52,5 +56,5 @@ def setup_logging(conf):
     except OSError as problem:
         if problem.errno != errno.EEXIST:
             raise
-        pass
+        
     logging.config.dictConfig(log_dict)
