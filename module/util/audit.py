@@ -7,17 +7,25 @@ Created on 2022年1月2日
 @author: 簡立軒, 黃禎智, 楊筱筠
 '''
 import sys, traceback
-
-# TODO: connect audit to logging
+import logging
+LOG = logging.getLogger(__name__)
 
 def input_error(parameter: str) -> str:
-    return f'[InputError] missing "{parameter}" parameter.'
+    msg = f'[InputError] missing "{parameter}" parameter.'
+    LOG.error(msg)
+    return msg
 
 def request_error(error: str) -> str:
-    return f'[RequestError] {error}'
+    msg = f'[RequestError] {error}'
+    LOG.error(msg)
+    return error
+
+def exception(error: str) -> str:
+    LOG.error(error)
+    return error
 
 # exception handler
-def except_raise(e):
+def except_raise(e) -> str:
     error_class = e.__class__.__name__ #取得錯誤類型
     detail = e.args[0] #取得詳細內容
     cl, exc, tb = sys.exc_info() #取得Call Stack

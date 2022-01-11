@@ -10,10 +10,15 @@ from . import audit
 from . import constants as cts
 import requests
 import json
+from typing import Tuple, Any
 import logging
+
 LOG = logging.getLogger(__name__)
 
-def call(method: str = "POST", url: str="", header: dict={}, payload: dict={}, parameter: dict={}):
+def call(
+    method: str = "POST", url: str="", 
+    header: dict={}, payload: dict={}, parameter: dict={}
+    ) -> Tuple[Any, str]:
     """
     Note: 
     @parameter: method
@@ -21,11 +26,14 @@ def call(method: str = "POST", url: str="", header: dict={}, payload: dict={}, p
     @parameter: header
     @parameter: payload
     @parameter: parameter
-    @return
+    @return Tuple[Any, str]
     """
     
+    # convert dict to str
     payload = json.dumps(payload, ensure_ascii=False)
+    # encode to utf-8
     payload = payload.encode('utf-8')
+    
     r_obj = None
     try:
         r_obj = requests.request(
@@ -42,7 +50,10 @@ def call(method: str = "POST", url: str="", header: dict={}, payload: dict={}, p
         LOG.error(f"Error accessing server: {str(e)}")
         return '', audit.request_error('ERROR_ACCESSING')
 
+    # check response
     if r_obj:
+        
+        # check http status
         if r_obj.status_code in [401, 403]:
             msg = f"Received {r_obj.status_code}, API Authentication Failed."
             return r_obj, audit.request_error(msg)
@@ -51,7 +62,7 @@ def call(method: str = "POST", url: str="", header: dict={}, payload: dict={}, p
             msg = f"Received {r_obj.status_code} error from server."
             return r_obj, audit.request_error(msg)
 
-    # load
+    # load response
     try:
         res = r_obj.json()
     except ValueError:
@@ -66,4 +77,4 @@ def read(request_stream: str) -> str:
     try:
         return request_stream.read().decode('utf-8')
     except Exception as e:
-        return e
+        return str(e)

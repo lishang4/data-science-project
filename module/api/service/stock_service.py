@@ -14,16 +14,17 @@ from module.prediction import model
 from module.prediction import plot
 from module.prediction import series as series_module
 
-import threading, asyncio
+import asyncio
 import logging, json, re, sys
 import torch
 import pandas as pd
 import mplfinance as mpf
 from torch.utils.data import DataLoader, TensorDataset
 from datetime import datetime
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Any
+
 LOG = logging.getLogger(__name__)
-sys.setrecursionlimit(20000)
+sys.setrecursionlimit(5000) # set recursion limit higher to avoid maximum recursion depth exceeded, default is 1000
 
 stocks = {}
 
@@ -46,34 +47,18 @@ async def get_stocks(req: LocalProxy) -> Tuple[Dict, str]:
     if resEndDate < resStartDate:
         return {}, audit.request_error("end date must bigger than start date")
     
-    # prepare for threads
+    # prepare for coroutine
     global stocks
     stocks = {}
-    threads_set = []
     
     tasks = [stock_job(parameter, date) for date in range(resStartDate, resEndDate+1)]
-    tasks1 = [raise_error(date) for date in range(resStartDate, resEndDate+1)]
-    
-    # set threads
-    #for date in range(resStartDate, resEndDate+1):
-    #    # TODO: append redis here
-        # set thread
-    #    thread = threading.Thread(target=stock_job,args=(parameter,date,))
-    #    thread.daemon =True
-    #    threads_set.append(thread)
-    
-    # do thread
-    #for t in threads_set:
-    #    t.start()
-    # wait thread
-    #t.join()
+    tasks1 = [raise_error(_) for _ in range(resStartDate, resEndDate+1)]
     
     _ = await asyncio.gather(*tasks, *tasks1, return_exceptions=True)
     
-    # TODO: transfer to DataFrame here
     return stocks, ''
 
-async def raise_error(num):
+async def raise_error(_) -> ValueError:
     raise ValueError
     
 async def get_stock(req: LocalProxy, stockCode: str) ->Tuple[List, str]:
@@ -90,33 +75,27 @@ async def get_stock(req: LocalProxy, stockCode: str) ->Tuple[List, str]:
             stock[stockCode].update({"Date": dt})
             pack.append(stock[stockCode])
             
-    name_attribute = [ # set header
-    'Date', 'Capacity', 'Turnover', 'Open', 'High', 'Low', 'Close', 'Change',
-    'Trascation'
-    ]
+    df = None
+    try:     
+        df = to_data_frame_and_save(pack, stockCode=stockCode)
+    except Exception as e:
+        return {}, audit.exception(str(e))
 
-    df = pd.DataFrame(columns=name_attribute, data=pack)
-    df['Date'] = pd.to_datetime(df['Date'], format="%Y-%m-%d") # 轉換str to Datetime
-    df.to_csv(f'module/data/{stockCode}.csv') # save data
-    df.index = pd.DatetimeIndex(df['Date']) # 設置 index 為 Datetime
-    df.rename(columns={'Turnover':'Volume'}, inplace = True)  # 針對資料表做修正，交易量(Turnover)在mplfinance中須被改為Volume才能被認出來
-
-    # set mpf attr
-    marketcolors = mpf.make_marketcolors(up='r',down='g',inherit=True)
-    style  = mpf.make_mpf_style(base_mpf_style='yahoo',marketcolors=marketcolors)
-    # set kwargs，並在變數中填上繪圖時會用到的設定值
-    kwargs = dict(type='candle', mav=(5,20,60), volume=True, figratio=(5,4), figscale=1, title=stockCode, style=style) 
-
-    # 選擇df資料表為資料來源，帶入kwargs參數，畫出目標股票的走勢圖
-    mpf.plot(df, **kwargs, savefig=f'module/api/file/{stockCode}_K.png')
+    # 畫 k 線圖並儲存
+    try:
+        draw_and_save_k_graph(df=df, stockCode=stockCode)
+    except Exception as e:
+        return {}, audit.exception(str(e))
     
-    # upload image to Imgur.
-    imgur = plot.Imgur()
-    image = imgur.upload(imgPath = f"/../api/file/{stockCode}_K.png", name=stockCode)
-    result = {
-        "image": image,
-        "data": pack
-    }
+    # 上傳至imgur圖床
+    result = None
+    try:
+        result = upload_to_imgur(pack, stockCode)
+    except Exception as e:
+        return {}, audit.exception(str(e))
+    
+    if not result:
+        return {}, audit.exception('empty result')
             
     return result, ''
 
@@ -173,6 +152,7 @@ async def stock_job(parameter: dict, date: int) -> Tuple[str, str]:
                     stock.update({fields[field]: data[idx]})
         
         # init date to stocks if not existing in stocks yet, otherwise append it
+        # data[0] is stock code
         if stocks.get(date):
             stocks[date].update({data[0]: stock})
         else:
@@ -181,7 +161,7 @@ async def stock_job(parameter: dict, date: int) -> Tuple[str, str]:
             
     return 'Done', ''
             
-def predict_stock_price(req: LocalProxy):
+def predict_stock_price(req: LocalProxy) -> Tuple[Dict, Any]:
     
     # load body
     body = {}
@@ -192,7 +172,7 @@ def predict_stock_price(req: LocalProxy):
     
     # check parameters
     if not body.get('stockCode'):
-        return
+        return {}, audit.input_error("stockCode")
     stockCode = body['stockCode']
     
     train = False
@@ -245,7 +225,7 @@ def predict_stock_price(req: LocalProxy):
     # do predict
     testData, testLabel = net.test_model(loader=testDataLoader)
 
-    # draw
+    # draw for predicted and real data
     real = [element * (series.close_max - series.close_min) + series.close_min for element in testData]
     test = [element * (series.close_max - series.close_min) + series.close_min for element in testLabel]
     plot.draw(originalData=real, testData=test, savePath=f"/file/{stockCode}.png")
@@ -259,3 +239,40 @@ def predict_stock_price(req: LocalProxy):
     }
     
     return result, ''
+
+# draw k線圖 for stocks
+def draw_and_save_k_graph(df: pd.DataFrame, stockCode: str) -> None:
+    # set mpf attr
+    marketcolors = mpf.make_marketcolors(up='r',down='g',inherit=True)
+    style  = mpf.make_mpf_style(base_mpf_style='yahoo',marketcolors=marketcolors)
+    # set kwargs，並在變數中填上繪圖時會用到的設定值
+    kwargs = dict(type='candle', mav=(5,20,60), volume=True, figratio=(5,4), figscale=1, title=stockCode, style=style) 
+
+    # 選擇df資料表為資料來源，帶入kwargs參數，畫出目標股票的走勢圖
+    mpf.plot(df, **kwargs, savefig=f'module/api/file/{stockCode}_K.png')
+    
+# convert to data frame and save to local storage
+def to_data_frame_and_save(pack: list, stockCode: str) -> pd.DataFrame:
+    # set header
+    name_attribute = [
+    'Date', 'Capacity', 'Turnover', 'Open', 'High', 'Low', 'Close', 'Change',
+    'Trascation'
+    ]
+    
+    df = pd.DataFrame(columns=name_attribute, data=pack)
+    df['Date'] = pd.to_datetime(df['Date'], format="%Y-%m-%d") # 轉換str to Datetime
+    df.to_csv(f'module/data/{stockCode}.csv') # save data
+    df.index = pd.DatetimeIndex(df['Date']) # 設置 index 為 Datetime
+    df.rename(columns={'Turnover':'Volume'}, inplace = True)  # 針對資料表做修正，交易量(Turnover)在mplfinance中須被改為Volume才能被認出來
+    return df
+
+# 上傳
+def upload_to_imgur(pack, stockCode) -> Dict:
+    # upload image to Imgur.
+    imgur = plot.Imgur()
+    image = imgur.upload(imgPath = f"/../api/file/{stockCode}_K.png", name=stockCode)
+    result = {
+        "image": image,
+        "data": pack
+    }
+    return result

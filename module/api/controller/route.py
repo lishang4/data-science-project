@@ -15,7 +15,7 @@ from flask_restful_swagger_2 import (
 )
 from module.api.controller import stock
 
-def setup_route(app):
+def setup_route(app) -> None:
     '''
     setup router
     '''
@@ -27,7 +27,7 @@ def setup_route(app):
     app.add_resource(stock.PredictStockPrice, '/api/v1/stock/predict/price')
 
 class HealthyCheck(Resource):
-    def get(self):
+    def get(self) -> Response:
         return Response(
             {
                 'status': '0', 

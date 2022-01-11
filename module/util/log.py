@@ -11,7 +11,7 @@ import errno
 import logging.config
 
 # setop logging config by dictConfig
-def setup_logging(conf):
+def setup_logging(conf) -> None:
     log_dict = {
         'version': 1,
         'disable_existing_loggers': False,
