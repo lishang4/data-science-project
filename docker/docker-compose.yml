@@ -5,7 +5,7 @@ networks:
 services:
   data-science-project:
     container_name: data-science-project
-    image: harbor.lishang4.com/fju/data-science-project:5411a26-20220103-0405
+    image: harbor.lishang4.com/lib/data-science-project:ec35816-20220110-1153
     deploy:
       replicas: 1
       resources:

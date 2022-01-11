@@ -14,8 +14,8 @@ from module.prediction import model
 from module.prediction import plot
 from module.prediction import series as series_module
 
-import threading
-import logging, json, re
+import threading, asyncio
+import logging, json, re, sys
 import torch
 import pandas as pd
 import mplfinance as mpf
@@ -23,10 +23,11 @@ from torch.utils.data import DataLoader, TensorDataset
 from datetime import datetime
 from typing import Tuple, List, Dict
 LOG = logging.getLogger(__name__)
+sys.setrecursionlimit(20000)
 
 stocks = {}
 
-def get_stocks(req: LocalProxy) -> Tuple[Dict, str]:
+async def get_stocks(req: LocalProxy) -> Tuple[Dict, str]:
 
     # check parameter
     parameter = {}
@@ -50,25 +51,34 @@ def get_stocks(req: LocalProxy) -> Tuple[Dict, str]:
     stocks = {}
     threads_set = []
     
+    tasks = [stock_job(parameter, date) for date in range(resStartDate, resEndDate+1)]
+    tasks1 = [raise_error(date) for date in range(resStartDate, resEndDate+1)]
+    
     # set threads
-    for date in range(resStartDate, resEndDate+1):
-        # TODO: append redis here
+    #for date in range(resStartDate, resEndDate+1):
+    #    # TODO: append redis here
         # set thread
-        thread = threading.Thread(target=stock_job,args=(parameter,date,))
-        threads_set.append(thread)
+    #    thread = threading.Thread(target=stock_job,args=(parameter,date,))
+    #    thread.daemon =True
+    #    threads_set.append(thread)
     
     # do thread
-    for t in threads_set:
-        t.start()
+    #for t in threads_set:
+    #    t.start()
     # wait thread
-    t.join()
+    #t.join()
+    
+    _ = await asyncio.gather(*tasks, *tasks1, return_exceptions=True)
     
     # TODO: transfer to DataFrame here
     return stocks, ''
-    
-def get_stock(req: LocalProxy, stockCode: str) ->Tuple[List, str]:
 
-    stocks, err = get_stocks(req)
+async def raise_error(num):
+    raise ValueError
+    
+async def get_stock(req: LocalProxy, stockCode: str) ->Tuple[List, str]:
+
+    stocks, err = await get_stocks(req)
     if err:
         return [], err
     
@@ -109,12 +119,9 @@ def get_stock(req: LocalProxy, stockCode: str) ->Tuple[List, str]:
     }
             
     return result, ''
-    
-lock = threading.Lock()
 
-def stock_job(parameter: dict, date: int) -> Tuple[str, str]:
+async def stock_job(parameter: dict, date: int) -> Tuple[str, str]:
     global stocks # load global stocks, sharing memory with all threads
-    lock.acquire() # lock to avoid memory sharing issue
     LOG.info(date)
     parameter.update({'date': date}) # makesure date is updated
     # do request
@@ -122,7 +129,6 @@ def stock_job(parameter: dict, date: int) -> Tuple[str, str]:
         "POST", const.TWSE_EXCHANGE_REPORT_URL,
         parameter=parameter,
     )
-    lock.release() # unlock
     
     # check response
     if err: 
@@ -210,7 +216,7 @@ def predict_stock_price(req: LocalProxy):
     series = series_module.Series(stockCode)
     data = series.get_series()
     feature, label = series.process_series(data, hyperParam['daysNum'])
-    boundary = int(len(feature) * 0.95) # 95% for train, 5% for test
+    boundary = int(len(feature) * 0.8) # 80% for train, 20% for test
     xTrain = feature[:boundary]
     yTrain = label[:boundary]
     xTest = feature[boundary:]

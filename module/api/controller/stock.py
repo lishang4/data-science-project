@@ -12,6 +12,8 @@ from flask_restful_swagger_2 import Resource
 from module.api.service import stock_service
 from module.util import response as resp
 
+import asyncio
+
 class GetStocks(Resource):
     """
     @parameter:   startdate
@@ -26,7 +28,12 @@ class GetStocks(Resource):
     """
     def get(self) -> Response:
         try:
-            res, err = stock_service.get_stocks(request)
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            loop = asyncio.get_event_loop()
+            task = asyncio.ensure_future(stock_service.get_stocks(request))
+            loop.run_until_complete(asyncio.wait([task]))
+            res, err = task.result()
         except Exception as err:
             return resp.set(status=-1, message='error', message_desc=str(err))
 
@@ -53,7 +60,12 @@ class GetStock(Resource):
     """
     def get(self, stockCode: str) -> Response:
         try:
-            res, err = stock_service.get_stock(request, stockCode)
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            loop = asyncio.get_event_loop()
+            task = asyncio.ensure_future(stock_service.get_stock(request, stockCode))
+            loop.run_until_complete(asyncio.wait([task]))
+            res, err = task.result()
         except Exception as err:
             return resp.set(status=-1, message='error', message_desc=str(err))
 
